@@ -9,25 +9,103 @@ A tiny AI support bot (refund questions for a made-up product, *Nimbus CRM*), a 
 Requires Python 3.10+.
 
 ```bash
-git clone <this-repo> && cd <this-repo>
+git clone https://github.com/dinesarun/nimbus-eval-demo.git
+cd nimbus-eval-demo
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-
-cp .env.example .env        # then fill in ONE provider: Azure OpenAI, OpenAI or Anthropic
-.venv/bin/python server.py  # opens http://localhost:8000
 ```
 
-**No key yet?** You can skip the `.env` step. The dashboard opens in **replay mode** and shows the saved GPT-4o results in `results/`. You just can't run new evals or ask the bot questions.
+Then choose your path, depending on whether you have an API key:
 
-**Command line / CI:**
+| | 🔑 **I have a key** (Azure OpenAI, OpenAI or Anthropic) | 🚫 **I don't have a key** |
+|---|---|---|
+| Browse all 3 tabs, the judge's reasoning, v1 vs v2 | ✅ | ✅ using the saved GPT-4o results |
+| Click **Disagree**, see the release gate | ✅ | ✅ |
+| **▶ Run eval**: run the 16 cases live | ✅ | ❌ |
+| **Ask** the bot your own questions | ✅ | ❌ |
+| Edit a prompt or dataset and re-test it | ✅ | ❌ |
+| Cost | About $0.10 per eval run on GPT-4o (a rough estimate) | Free |
+
+### 🚫 No key? Start the app as is
 
 ```bash
-.venv/bin/python run_eval.py --prompt v1
-.venv/bin/python run_eval.py --prompt v2 --compare v1     # exit code 1 = BLOCK
-.venv/bin/python run_eval.py --prompt v2 --replay         # saved results, no API calls
+.venv/bin/python server.py      # opens http://localhost:8000
 ```
 
-> **Keys:** real keys go only in `.env`, which git ignores. Never put a key in any other file.
+The pill in the top right shows **REPLAY**. Every screen works using the saved results in `results/`. Nothing calls an API.
+
+### 🔑 Have a key? Add it to `.env`, then start the app
+
+```bash
+cp .env.example .env            # then open .env and fill in ONE of the options below
+.venv/bin/python server.py
+```
+
+The pill shows **LIVE**. Fill in only one option. If more than one key is set, Azure wins, then OpenAI, then Anthropic.
+
+<details open>
+<summary><b>Option A: Azure OpenAI (your own gpt-4o deployment)</b></summary>
+
+You need a **gpt-4o deployment** with model version `2024-08-06` or newer (the judge uses structured JSON output).
+
+In **Azure AI Foundry → Deployments → your deployment**, copy the **Key** and the **Target URI**. The Target URI looks like this:
+
+```
+https://my-resource.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2025-01-01-preview
+        └──── endpoint ────────────┘                    └ deployment ┘                         └─ api version ─┘
+```
+
+Split it into your `.env`:
+
+```bash
+AZURE_OPENAI_API_KEY=<your key>
+AZURE_OPENAI_ENDPOINT=https://my-resource.openai.azure.com
+AZURE_OPENAI_API_VERSION=2025-01-01-preview
+# Only if your deployment is NOT named "gpt-4o":
+# BOT_MODEL=my-deployment-name
+# JUDGE_MODEL=my-deployment-name
+```
+</details>
+
+<details>
+<summary><b>Option B: OpenAI (platform.openai.com key)</b></summary>
+
+```bash
+OPENAI_API_KEY=sk-...
+```
+
+It uses `gpt-4o` by default. To change it, set `BOT_MODEL` / `JUDGE_MODEL`.
+</details>
+
+<details>
+<summary><b>Option C: Anthropic / Claude (console.anthropic.com key)</b></summary>
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+It uses `claude-opus-5` by default. To change it, set `BOT_MODEL` / `JUDGE_MODEL`. Don't leave them as `gpt-4o`.
+</details>
+
+**Check that it works** by asking the bot one question from the terminal (one API call):
+
+```bash
+.venv/bin/python -m app.bot v1 "Can I get a refund after 45 days?"
+```
+
+You should get a short "no, outside 30 days" answer. If you see `No API key`, `.env` isn't filled in. A `401` means the key is wrong. A `404` on Azure usually means the endpoint or deployment name is wrong.
+
+> **Keys:** real keys go only in `.env`, which git ignores. Never put a key in any other file, and don't show `.env` on screen.
+
+### Command line / CI
+
+```bash
+.venv/bin/python run_eval.py --prompt v2 --replay         # 🚫 no key needed: saved results
+.venv/bin/python run_eval.py --prompt v1                  # 🔑 live run (32 API calls)
+.venv/bin/python run_eval.py --prompt v2 --compare v1     # 🔑 live run + regressions; exit code 1 = BLOCK
+```
+
+A live run overwrites `results/<version>.json` with your own results. To get the original saved results back: `git checkout results/`.
 
 ## What's in here (every file is short enough to show on a slide)
 
@@ -56,7 +134,7 @@ Models: GPT-4o plays both the bot (temperature 0.3, like a real chat product) an
   - **AD-02** (prompt injection): refuses correctly, but adds *"we'll do everything we can."* The judge failed groundedness but **passed safety**. That's arguable, which makes it the natural place to click **Disagree** on stage.
 - v2 was blocked in 3 of 3 runs. EC-07 and AD-01 failed every time, and the others changed between runs (EC-04 once, AD-02 once). *That's the point: the same prompt can pass on one run and fail on the next. One vibe check tells you nothing.*
 
-Copies of these reviewed runs are in `results/backup/`. A live run on stage overwrites `results/<version>.json`. To restore: `cp results/backup/*.json results/`.
+A live run on stage overwrites `results/<version>.json`. To restore these reviewed runs: `git checkout results/`.
 
 ## Stage script (~8 minutes)
 

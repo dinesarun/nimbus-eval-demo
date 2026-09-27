@@ -31,4 +31,7 @@ if __name__ == "__main__":
     import sys
 
     version, question = sys.argv[1], " ".join(sys.argv[2:])
-    print(ask(version, question))
+    try:
+        print(ask(version, question))
+    except llm.LLMError as e:
+        sys.exit(f"Error: {e}")

@@ -310,7 +310,7 @@ function renderEval() {
   if (CURRENT?.source === "sample")
     banner.push(`<div class="banner">These are <b>sample results</b> I wrote by hand so the UI works before you have an API key. Click <b>Run eval</b> to replace them with a real run.</div>`);
   if (!META.has_key)
-    banner.push(`<div class="banner">No <code>OPENAI_API_KEY</code> found. Live runs will fail, but saved results still work (replay mode).</div>`);
+    banner.push(`<div class="banner">No API key found. Live runs won't work, but the saved results do (replay mode). To run live, copy <code>.env.example</code> to <code>.env</code> and add an Azure OpenAI, OpenAI or Anthropic key.</div>`);
   $("#evalBanner").innerHTML = banner.join("");
 
   if (!CURRENT) {
