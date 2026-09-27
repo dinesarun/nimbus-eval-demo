@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nimbus Eval Demo</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #14171f; --muted: #5d6475; --line: #e3e6ec;
+    --accent: #3b5bdb; --accent-soft: #e8edff;
+    --pass: #1a7f37; --pass-soft: #e3f5e8; --fail: #c62828; --fail-soft: #fdeaea;
+    --warn: #9a6700; --warn-soft: #fff4d6; --na: #8a90a0;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1116; --panel: #171a21; --ink: #e8eaf0; --muted: #9aa1b2; --line: #2a2f3a;
+      --accent: #7c95ff; --accent-soft: #1e2440;
+      --pass: #4ac26b; --pass-soft: #14291b; --fail: #ff6b6b; --fail-soft: #331a1a;
+      --warn: #e3b341; --warn-soft: #2e2511; --na: #6b7182;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1116; --panel: #171a21; --ink: #e8eaf0; --muted: #9aa1b2; --line: #2a2f3a;
+    --accent: #7c95ff; --accent-soft: #1e2440;
+    --pass: #4ac26b; --pass-soft: #14291b; --fail: #ff6b6b; --fail-soft: #331a1a;
+    --warn: #e3b341; --warn-soft: #2e2511; --na: #6b7182;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+  header { padding: 20px 32px 0; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+  header .sub { color: var(--muted); font-size: 14px; }
+  header .spacer { flex: 1; }
+  .pill { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 99px; white-space: nowrap; }
+  nav { display: flex; gap: 4px; padding: 16px 32px 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
+  nav button { background: none; border: 0; padding: 10px 16px; font: inherit; font-weight: 600; color: var(--muted);
+               border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
+  nav button.active { color: var(--ink); border-bottom-color: var(--accent); }
+  nav button .n { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+                  background: var(--line); font-size: 12px; margin-right: 6px; }
+  nav button.active .n { background: var(--accent); color: #fff; }
+  main { padding: 24px 32px 64px; max-width: 1280px; }
+  section { display: none; } section.active { display: block; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .lead { color: var(--muted); margin: 0 0 20px; max-width: 760px; }
+  select, input, textarea, button.btn { font: inherit; border-radius: 8px; border: 1px solid var(--line);
+                                        background: var(--panel); color: var(--ink); padding: 8px 12px; }
+  textarea { width: 100%; resize: vertical; }
+  button.btn { cursor: pointer; font-weight: 600; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.btn:disabled { opacity: .5; cursor: default; }
+  label.small { font-size: 13px; color: var(--muted); font-weight: 600; }
+
+  /* playground */
+  .chat { display: grid; gap: 12px; margin-top: 16px; }
+  .bubble { padding: 14px 16px; border-radius: 12px; max-width: 760px; white-space: pre-wrap; }
+  .bubble.user { background: var(--accent-soft); justify-self: end; }
+  .bubble.bot { background: var(--panel); border: 1px solid var(--line); }
+  .bubble .who { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+  .suggest { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .suggest button { font: inherit; font-size: 13px; background: var(--panel); border: 1px dashed var(--line);
+                    color: var(--muted); border-radius: 99px; padding: 4px 12px; cursor: pointer; }
+
+  /* metrics */
+  .verdict { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: 12px; margin: 20px 0;
+             font-size: 20px; font-weight: 700; }
+  .verdict.ship { background: var(--pass-soft); color: var(--pass); }
+  .verdict.block { background: var(--fail-soft); color: var(--fail); }
+  .verdict.pending { background: var(--accent-soft); color: var(--accent); }
+  .verdict .detail { font-size: 14px; font-weight: 500; color: var(--ink); opacity: .8; }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .metric .name { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .metric .val { font-size: 40px; font-weight: 750; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .metric .gate { font-size: 13px; color: var(--muted); }
+  .bar { height: 8px; background: var(--line); border-radius: 99px; position: relative; margin-top: 10px; overflow: visible; }
+  .bar > i { position: absolute; inset: 0 auto 0 0; border-radius: 99px; }
+  .bar > b { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); }
+  .progress { height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; margin-top: 12px; }
+  .progress i { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+
+  /* table */
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+       padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr.case { cursor: pointer; } tr.case:hover td { background: var(--accent-soft); }
+  tr.detail td { background: var(--bg); }
+  .cat { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--line); color: var(--muted); white-space: nowrap; }
+  .cat.adversarial { background: var(--warn-soft); color: var(--warn); }
+  .cat.production_bug { background: var(--fail-soft); color: var(--fail); }
+  .v { display: inline-block; min-width: 44px; text-align: center; font-size: 12px; font-weight: 700; padding: 2px 6px; border-radius: 6px; }
+  .v.p { background: var(--pass-soft); color: var(--pass); }
+  .v.f { background: var(--fail-soft); color: var(--fail); }
+  .v.na { color: var(--na); }
+  .v.h { outline: 2px solid var(--warn); outline-offset: 1px; }
+  table.cases { table-layout: fixed; }  /* keep long judge reasons inside the screen */
+  .judge-line span { overflow-wrap: anywhere; }
+  tr.case td:first-child { white-space: nowrap; }
+  .muted { color: var(--muted); }
+  .detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 800px) { .detail-grid { grid-template-columns: minmax(0, 1fr); } main, header, nav { padding-left: 16px; padding-right: 16px; } }
+  .detail-grid h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .answer { white-space: pre-wrap; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+  .judge-line { display: grid; grid-template-columns: 110px 60px minmax(0, 1fr) auto; gap: 8px; align-items: start; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+  .judge-line:last-child { border-bottom: 0; }
+  .agree button { font-size: 12px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); cursor: pointer; }
+  .agree button.on { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+  .banner { padding: 10px 14px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-size: 14px; margin-bottom: 16px; }
+  .banner.err { background: var(--fail-soft); color: var(--fail); }
+
+  /* compare */
+  .cmp { width: 100%; font-size: 16px; }
+  .cmp td, .cmp th { padding: 12px; }
+  .cmp .num { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .delta.up { color: var(--pass); } .delta.down { color: var(--fail); }
+  .diff { font-family: var(--mono); font-size: 13px; white-space: pre-wrap; background: var(--panel); border: 1px solid var(--line);
+          border-radius: 8px; padding: 12px; max-height: 420px; overflow: auto; }
+  .diff .add { background: var(--pass-soft); color: var(--pass); display: block; }
+  .diff .del { background: var(--fail-soft); color: var(--fail); display: block; text-decoration: line-through; }
+  .diff .same { color: var(--muted); display: block; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
+  h3 { margin: 0 0 12px; font-size: 16px; }
+
+  /* judge prompt viewer */
+  .linkbtn { font: inherit; font-size: 12px; font-weight: 700; text-transform: none; letter-spacing: 0; color: var(--accent);
+             background: var(--accent-soft); border: 0; border-radius: 6px; padding: 3px 10px; margin-left: 8px; cursor: pointer; }
+  .modal { position: fixed; inset: 0; z-index: 50; background: rgba(10, 12, 18, .55); display: none; padding: 32px 16px; overflow-y: auto; }
+  .modal.open { display: block; }
+  .sheet { background: var(--panel); color: var(--ink); max-width: 980px; margin: 0 auto; border-radius: 14px; border: 1px solid var(--line); padding: 24px; }
+  .sheet .head { display: flex; align-items: start; gap: 12px; margin-bottom: 8px; }
+  .sheet .head h2 { margin: 0; font-size: 22px; flex: 1; }
+  .sheet .close { font: inherit; font-size: 22px; line-height: 1; background: none; border: 0; color: var(--muted); cursor: pointer; }
+  .sheet .part { margin-top: 20px; }
+  .sheet .part h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 4px; }
+  .sheet .part h3 .n { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 13px; }
+  .sheet .part p { margin: 0 0 8px; color: var(--muted); font-size: 14px; }
+  .code { font-family: var(--mono); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg);
+          border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin: 0; }
+  .code .tag { color: var(--accent); font-weight: 700; }
+  .code .metric { background: var(--warn-soft); color: var(--warn); font-weight: 700; border-radius: 3px; padding: 0 2px; }
+  .code .t { color: var(--pass); font-weight: 700; } .code .f { color: var(--fail); font-weight: 700; }
+  .code details { margin: 2px 0; } .code summary { cursor: pointer; color: var(--muted); font-style: italic; }
+  .empty { color: var(--muted); padding: 24px; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Nimbus Support Bot</h1>
+  <span class="sub">How do you know your AI feature actually works?</span>
+  <span class="spacer"></span>
+  <a href="/how-it-works" style="font-size:14px;font-weight:600;color:var(--accent);text-decoration:none">How it works ↗</a>
+  <span id="modePill" class="pill"></span>
+</header>
+<nav>
+  <button data-tab="vibe" class="active"><span class="n">1</span>Vibe check</button>
+  <button data-tab="eval"><span class="n">2</span>Run evals</button>
+  <button data-tab="compare"><span class="n">3</span>Release gate</button>
+</nav>
+<main>
+
+<!-- 1. VIBE CHECK -->
+<section id="vibe" class="active">
+  <p class="lead">This is how most teams test AI: ask it a few questions, read the answers, decide it "looks good".</p>
+  <div class="card">
+    <div class="row">
+      <label class="small">Prompt</label>
+      <select id="askVersion"></select>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <input id="askInput" style="flex:1;min-width:240px" placeholder="Ask the support bot something…">
+      <button class="btn primary" id="askBtn">Ask</button>
+    </div>
+    <div class="suggest" id="suggest"></div>
+    <div class="chat" id="chat"></div>
+    <div id="addCase" style="display:none;margin-top:16px" class="card">
+      <h3>Wrong answer? Turn it into an eval case</h3>
+      <p class="muted" style="margin:0 0 8px;font-size:14px">Don't just fix the prompt. Save it so this failure can never silently come back.</p>
+      <label class="small">What should the bot have done?</label>
+      <textarea id="expectedInput" rows="2" placeholder="e.g. Not eligible — 45 days is outside the 30-day window. No exceptions."></textarea>
+      <div class="row" style="margin-top:8px"><button class="btn" id="addCaseBtn">Add to eval dataset</button><span id="addCaseMsg" class="muted"></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 2. RUN EVALS -->
+<section id="eval">
+  <p class="lead">Every case in the dataset goes through the bot. Code checks handle the rules we can write as code, and an LLM judge grades the rest against the policy. Click any row to see why the judge decided what it did.</p>
+  <div id="evalBanner"></div>
+  <div class="card">
+    <div class="row">
+      <label class="small">Prompt</label>
+      <select id="evalVersion"></select>
+      <button class="btn primary" id="runBtn">▶ Run eval (live)</button>
+      <span class="muted" id="runMeta" style="font-size:13px"></span>
+    </div>
+    <div class="progress" id="progressWrap" style="display:none"><i id="progressBar" style="width:0"></i></div>
+  </div>
+  <div id="verdict"></div>
+  <div class="metrics" id="metrics"></div>
+  <div id="agreement" class="muted" style="margin-top:12px;font-size:14px"></div>
+  <table class="cases">
+    <colgroup><col style="width:80px"><col style="width:130px"><col><col style="width:96px"><col style="width:100px"><col style="width:80px"><col style="width:116px"></colgroup>
+    <thead><tr><th>Case</th><th>Type</th><th>Question</th><th>Correct</th><th>Grounded</th><th>Safe</th><th>Code checks</th></tr></thead>
+    <tbody id="caseRows"></tbody>
+  </table>
+</section>
+
+<!-- 3. RELEASE GATE -->
+<section id="compare">
+  <p class="lead">Someone changed the prompt to make the bot "friendlier". Should we ship it? Don't look at the average. Look at what regressed.</p>
+  <div class="card">
+    <div class="row">
+      <label class="small">Baseline</label><select id="baseVersion"></select>
+      <label class="small">Candidate</label><select id="candVersion"></select>
+      <button class="btn primary" id="cmpBtn">Compare</button>
+    </div>
+  </div>
+  <div id="cmpOut" style="margin-top:20px"></div>
+</section>
+
+</main>
+<div class="modal" id="promptModal"><div class="sheet" id="promptSheet"></div></div>
+<script>
+const $ = s => document.querySelector(s);
+const METRICS = ["correctness", "groundedness", "safety", "code_checks"];
+const LABEL = { correctness: "Correctness", groundedness: "Groundedness", safety: "Safety", code_checks: "Code checks" };
+let META = null, CURRENT = null, HUMAN = {}, OPEN = new Set();
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const pct = x => Math.round(x * 100) + "%";
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || r.statusText);
+  return data;
+}
+
+// ---------- tabs
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button, section").forEach(x => x.classList.remove("active"));
+  b.classList.add("active"); $("#" + b.dataset.tab).classList.add("active");
+  history.replaceState(null, "", "#" + b.dataset.tab);
+  if (b.dataset.tab === "compare" && META) compare();
+});
+
+// ---------- verdict helpers (mirror evals/runner.py)
+function rowPasses(row, m) {
+  if (row.error) return false;
+  if (m === "code_checks") return row.code_checks.applicable ? row.code_checks.pass : null;
+  return row.judge[m].pass;
+}
+function summarize(rows) {
+  const out = {};
+  for (const m of METRICS) {
+    const v = rows.map(r => rowPasses(r, m)).filter(x => x !== null);
+    const passed = v.filter(Boolean).length, rate = v.length ? passed / v.length : 1;
+    out[m] = { passed, total: v.length, rate, threshold: META.thresholds[m], ok: rate >= META.thresholds[m] };
+  }
+  return out;
+}
+
+// ---------- 1. vibe check
+function initVibe() {
+  const qs = ["I bought the monthly plan 10 days ago. Can I get a refund?",
+              "How long does a refund take?",
+              "I bought the annual plan 45 days ago. I'm really upset, please make an exception!"];
+  $("#suggest").innerHTML = qs.map(q => `<button>${esc(q)}</button>`).join("");
+  $("#suggest").querySelectorAll("button").forEach(b => b.onclick = () => { $("#askInput").value = b.textContent; ask(); });
+  $("#askBtn").onclick = ask;
+  $("#askInput").onkeydown = e => { if (e.key === "Enter") ask(); };
+  $("#addCaseBtn").onclick = addCase;
+}
+let lastQuestion = "";
+async function ask() {
+  const q = $("#askInput").value.trim(); if (!q) return;
+  lastQuestion = q;
+  const v = $("#askVersion").value;
+  $("#chat").innerHTML = `<div class="bubble user"><div class="who">Customer</div>${esc(q)}</div>
+                          <div class="bubble bot"><div class="who">Bot · prompt ${esc(v)}</div><span class="muted">thinking…</span></div>`;
+  $("#askBtn").disabled = true;
+  try {
+    const { answer } = await api("/api/ask", { version: v, question: q });
+    $("#chat").lastElementChild.innerHTML = `<div class="who">Bot · prompt ${esc(v)}</div>${esc(answer)}`;
+    $("#addCase").style.display = "block"; $("#addCaseMsg").textContent = ""; $("#expectedInput").value = "";
+  } catch (e) {
+    $("#chat").lastElementChild.innerHTML = `<div class="who">Error</div><span style="color:var(--fail)">${esc(e.message)}</span>`;
+  } finally { $("#askBtn").disabled = false; }
+}
+async function addCase() {
+  const expected = $("#expectedInput").value.trim();
+  if (!expected) { $("#addCaseMsg").textContent = "Describe the expected behavior first."; return; }
+  const { case: c } = await api("/api/add_case", { question: lastQuestion, expected });
+  META.dataset.push(c);
+  $("#addCaseMsg").textContent = `Saved as ${c.id}. It runs on every eval from now on.`;
+}
+
+// ---------- 2. run evals
+async function loadResult(version) {
+  const { result, human } = await api("/api/results/" + version);
+  CURRENT = result; HUMAN = human || {}; OPEN.clear();
+  renderEval();
+}
+function renderEval() {
+  const v = $("#evalVersion").value;
+  const banner = [];
+  if (CURRENT?.source === "sample")
+    banner.push(`<div class="banner">These are <b>sample results</b> I wrote by hand so the UI works before you have an API key. Click <b>Run eval</b> to replace them with a real run.</div>`);
+  if (!META.has_key)
+    banner.push(`<div class="banner">No <code>OPENAI_API_KEY</code> found. Live runs will fail, but saved results still work (replay mode).</div>`);
+  $("#evalBanner").innerHTML = banner.join("");
+
+  if (!CURRENT) {
+    $("#runMeta").textContent = "No saved results for this version yet.";
+    $("#verdict").innerHTML = ""; $("#metrics").innerHTML = ""; $("#agreement").textContent = "";
+    $("#caseRows").innerHTML = `<tr><td colspan="7" class="empty">Click ▶ Run eval to grade ${META.dataset.length} cases.</td></tr>`;
+    return;
+  }
+  const when = CURRENT.source === "live" ? `Last run ${CURRENT.created_at.replace("T", " ")}` : "Sample data";
+  $("#runMeta").textContent = `${when} · bot ${CURRENT.models.bot} · judge ${CURRENT.models.judge}`;
+  renderSummary(CURRENT.cases, false);
+  renderRows(CURRENT.cases, v);
+}
+function renderSummary(rows, running) {
+  const s = summarize(rows);
+  const ship = Object.values(s).every(m => m.ok);
+  const failing = Object.entries(s).filter(([, m]) => !m.ok).map(([k]) => LABEL[k]);
+  const passing = rows.filter(r => METRICS.every(m => rowPasses(r, m) !== false)).length;
+  $("#verdict").innerHTML = running
+    ? `<div class="verdict pending">Running… ${rows.length}/${META.dataset.length} graded</div>`
+    : ship ? `<div class="verdict ship">✅ SHIP <span class="detail">${passing}/${rows.length} cases fully passing · every metric meets its gate</span></div>`
+           : `<div class="verdict block">🚫 BLOCK <span class="detail">${failing.join(", ")} below the gate · ${passing}/${rows.length} cases fully passing</span></div>`;
+  $("#metrics").innerHTML = METRICS.map(m => {
+    const x = s[m], color = x.ok ? "var(--pass)" : "var(--fail)";
+    return `<div class="card metric">
+      <div class="name">${LABEL[m]}</div>
+      <div class="val" style="color:${color}">${pct(x.rate)}</div>
+      <div class="gate">${x.passed}/${x.total} pass · gate ≥ ${pct(x.threshold)}</div>
+      <div class="bar"><i style="width:${x.rate * 100}%;background:${color}"></i><b style="left:${x.threshold * 100}%"></b></div>
+    </div>`;
+  }).join("");
+  // human calibration
+  let labeled = 0, agree = 0;
+  for (const [id, ms] of Object.entries(HUMAN)) {
+    const row = rows.find(r => r.id === id); if (!row || row.error) continue;
+    for (const [m, h] of Object.entries(ms)) { labeled++; if (row.judge[m].pass === h) agree++; }
+  }
+  $("#agreement").innerHTML = labeled
+    ? `👤 Human review: you overrode the judge on <b>${labeled - agree}</b> verdict(s). Who evaluates the evaluator? You do.`
+    : `👤 Open a row and click <b>Disagree</b> if you think the judge got it wrong. That's how you calibrate an LLM judge.`;
+}
+function cell(row, m) {
+  const v = rowPasses(row, m);
+  const h = HUMAN[row.id]?.[m];
+  const hcls = h !== undefined ? " h" : "";
+  const title = h !== undefined ? ' title="A human disagreed with the judge"' : "";
+  if (v === null) return `<span class="v na">n/a</span>`;
+  return v ? `<span class="v p${hcls}"${title}>PASS</span>` : `<span class="v f${hcls}"${title}>FAIL</span>`;
+}
+function renderRows(rows, version) {
+  $("#caseRows").innerHTML = rows.map(r => {
+    const main = `<tr class="case" data-id="${r.id}">
+      <td><b>${r.id}</b></td><td><span class="cat ${r.category}">${r.category.replace("_", " ")}</span></td>
+      <td class="q">${esc(r.question)}</td>
+      ${METRICS.map(m => `<td>${cell(r, m)}</td>`).join("")}</tr>`;
+    if (!OPEN.has(r.id)) return main;
+    if (r.error) return main + `<tr class="detail"><td colspan="7"><div class="banner err">${esc(r.error)}</div></td></tr>`;
+    const judge = ["correctness", "groundedness", "safety"].map(m => {
+      const disagreed = HUMAN[r.id]?.[m] !== undefined;
+      return `<div class="judge-line"><b>${LABEL[m]}</b>${cell(r, m)}<span>${esc(r.judge[m].reason)}</span>
+        <span class="agree"><button class="${disagreed ? "on" : ""}" data-id="${r.id}" data-m="${m}">${disagreed ? "Disagreed ✓" : "Disagree"}</button></span></div>`;
+    }).join("");
+    const cc = r.code_checks.applicable
+      ? (r.code_checks.pass ? `<span class="v p">PASS</span>` : `<span class="v f">FAIL</span> ${esc(r.code_checks.failures.join("; "))}`)
+      : `<span class="muted">No code rules for this case</span>`;
+    return main + `<tr class="detail"><td colspan="7"><div class="detail-grid">
+      <div><h4>Bot answer</h4><div class="answer">${esc(r.answer)}</div>
+           <h4 style="margin-top:12px">Expected behavior</h4><div class="muted">${esc(r.expected)}</div></div>
+      <div><h4>LLM judge <button class="linkbtn" data-prompt="${r.id}">Show judge prompt</button></h4>${judge}<h4 style="margin-top:12px">Code checks</h4>${cc}</div>
+    </div></td></tr>`;
+  }).join("");
+  $("#caseRows").querySelectorAll("tr.case").forEach(tr => tr.onclick = () => {
+    OPEN.has(tr.dataset.id) ? OPEN.delete(tr.dataset.id) : OPEN.add(tr.dataset.id); renderRows(rows, version);
+  });
+  $("#caseRows").querySelectorAll("[data-prompt]").forEach(b => b.onclick = e => {
+    e.stopPropagation(); showJudgePrompt(version, b.dataset.prompt);
+  });
+  $("#caseRows").querySelectorAll(".agree button").forEach(b => b.onclick = async e => {
+    e.stopPropagation();
+    const row = rows.find(r => r.id === b.dataset.id), m = b.dataset.m;
+    const already = HUMAN[row.id]?.[m] !== undefined;
+    const pass = already ? null : !row.judge[m].pass;
+    await api("/api/human", { version, id: row.id, metric: m, pass });
+    HUMAN[row.id] = HUMAN[row.id] || {};
+    if (pass === null) delete HUMAN[row.id][m]; else HUMAN[row.id][m] = pass;
+    renderSummary(rows, false); renderRows(rows, version);
+  });
+}
+// ---------- judge prompt viewer: exactly what the judge was sent, and what it replied
+async function showJudgePrompt(version, id) {
+  let d;
+  try { d = await api("/api/judge_prompt", { version, id }); } catch (e) { alert(e.message); return; }
+  const instructions = esc(d.system).replace(/^(- )(correctness|groundedness|safety)(:)/gm, '$1<span class="metric">$2</span>$3');
+  const message = esc(d.user)
+    .replace(/&lt;policy&gt;\n([\s\S]*?)\n&lt;\/policy&gt;/,
+             (_, body) => `<span class="tag">&lt;policy&gt;</span><details><summary>The full refund policy (same for every question). Click to expand</summary>${body}</details><span class="tag">&lt;/policy&gt;</span>`)
+    .replace(/&lt;\/?(question|expected_behavior|bot_answer)&gt;/g, m => `<span class="tag">${m}</span>`);
+  const reply = esc(JSON.stringify(d.reply, null, 2))
+    .replace(/&quot;pass&quot;: true/g, '&quot;pass&quot;: <span class="t">true</span>')
+    .replace(/&quot;pass&quot;: false/g, '&quot;pass&quot;: <span class="f">false</span>');
+  $("#promptSheet").innerHTML = `
+    <div class="head"><h2>What the judge saw for ${esc(id)}</h2><button class="close" aria-label="Close">×</button></div>
+    <div class="muted" style="font-size:14px">Judge model: ${esc(d.model)} · temperature 0 · must reply in the JSON format below · prompt ${esc(version)} run</div>
+    <div class="part"><h3><span class="n">1</span>Instructions</h3>
+      <p>The same for every question. This is where "correct" is defined. The highlighted words are the three metrics.</p>
+      <pre class="code">${instructions}</pre></div>
+    <div class="part"><h3><span class="n">2</span>The message for this question</h3>
+      <p>Four inputs: the policy, the customer's question, the answer key (expected behavior), and the bot's answer.</p>
+      <pre class="code">${message}</pre></div>
+    <div class="part"><h3><span class="n">3</span>What the judge replied</h3>
+      <p>For each metric it writes a one-line reason first, then a verdict. The dashboard shows exactly this.</p>
+      <pre class="code">${reply}</pre></div>`;
+  $("#promptSheet .close").onclick = closeJudgePrompt;
+  $("#promptModal").classList.add("open");
+}
+function closeJudgePrompt() { $("#promptModal").classList.remove("open"); }
+$("#promptModal").onclick = e => { if (e.target.id === "promptModal") closeJudgePrompt(); };
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeJudgePrompt(); });
+
+async function runEval() {
+  const v = $("#evalVersion").value;
+  try { await api("/api/run", { version: v }); } catch (e) { alert(e.message); return; }
+  $("#runBtn").disabled = true; $("#progressWrap").style.display = "block"; CURRENT = null; HUMAN = {};
+  $("#evalBanner").innerHTML = "";
+  const poll = async () => {
+    const p = await api("/api/progress");
+    $("#progressBar").style.width = (p.rows.length / p.total * 100) + "%";
+    const order = Object.fromEntries(META.dataset.map((c, i) => [c.id, i]));
+    const rows = [...p.rows].sort((a, b) => order[a.id] - order[b.id]);
+    if (rows.length) { renderSummary(rows, p.running); renderRows(rows, v); }
+    if (p.running) return setTimeout(poll, 700);
+    $("#runBtn").disabled = false; $("#progressWrap").style.display = "none";
+    await loadResult(v);  // show the last saved run (if any), even when this one failed
+    if (p.error) $("#evalBanner").innerHTML = `<div class="banner err">Run failed: ${esc(p.error)}</div>` + $("#evalBanner").innerHTML;
+  };
+  poll();
+}
+
+// ---------- 3. compare
+function lineDiff(a, b) {
+  const A = a.split("\n"), B = b.split("\n"), n = A.length, m = B.length;
+  const L = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+    L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const out = []; let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (A[i] === B[j]) { out.push(["same", A[i]]); i++; j++; }
+    else if (L[i + 1][j] >= L[i][j + 1]) out.push(["del", A[i++]]);
+    else out.push(["add", B[j++]]);
+  }
+  while (i < n) out.push(["del", A[i++]]); while (j < m) out.push(["add", B[j++]]);
+  return out.filter(([t, s]) => !(t === "same" && s.startsWith("{knowledge_base}")))
+            .map(([t, s]) => `<span class="${t}">${t === "add" ? "+ " : t === "del" ? "− " : "  "}${esc(s) || " "}</span>`).join("");
+}
+async function compare() {
+  const bv = $("#baseVersion").value, cv = $("#candVersion").value;
+  const [b, c] = await Promise.all([api("/api/results/" + bv), api("/api/results/" + cv)]);
+  if (!b.result || !c.result) {
+    $("#cmpOut").innerHTML = `<div class="banner">Run evals for both ${esc(bv)} and ${esc(cv)} first (tab 2).</div>`; return;
+  }
+  const { regressions } = await api("/api/compare", { baseline: bv, candidate: cv });
+  const sb = summarize(b.result.cases), sc = summarize(c.result.cases);
+  const ship = Object.values(sc).every(m => m.ok);
+  const avg = s => ["correctness", "groundedness", "safety"].reduce((t, m) => t + s[m].rate, 0) / 3;
+  const d = avg(sc) - avg(sb);
+  const rows = METRICS.map(m => {
+    const delta = sc[m].rate - sb[m].rate;
+    const cls = delta > 0 ? "up" : delta < 0 ? "down" : "";
+    return `<tr><td>${LABEL[m]}</td><td class="num">${pct(sb[m].rate)}</td><td class="num" style="color:${sc[m].ok ? "var(--pass)" : "var(--fail)"}">${pct(sc[m].rate)}</td>
+      <td class="num delta ${cls}">${delta > 0 ? "▲ +" : delta < 0 ? "▼ " : ""}${delta ? Math.round(delta * 100) + " pts" : "no change"}</td>
+      <td class="muted">≥ ${pct(sc[m].threshold)}</td></tr>`;
+  }).join("");
+  const regs = regressions.length
+    ? regressions.map(r => `<tr><td><b>${r.id}</b></td><td>${esc(r.question)}</td><td>${r.metrics.map(m => `<span class="v f">${LABEL[m]}</span>`).join(" ")}</td></tr>`).join("")
+    : `<tr><td colspan="3" class="empty">No case that passed on ${esc(bv)} fails on ${esc(cv)}.</td></tr>`;
+  $("#cmpOut").innerHTML = `
+    <div class="verdict ${ship ? "ship" : "block"}">${ship ? `✅ SHIP ${esc(cv)}` : `🚫 BLOCK ${esc(cv)}`}
+      <span class="detail">Average quality ${d >= 0 ? "+" : ""}${Math.round(d * 100)} pts · ${regressions.length} regression(s) vs ${esc(bv)}</span></div>
+    <div class="two">
+      <div class="card"><h3>Scores</h3><table class="cmp"><thead><tr><th>Metric</th><th>${esc(bv)}</th><th>${esc(cv)}</th><th>Change</th><th>Gate</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="card"><h3>What changed in the prompt</h3><div class="diff">${lineDiff(META.prompts[bv], META.prompts[cv])}</div></div>
+    </div>
+    <div class="card" style="margin-top:16px"><h3>Regressions: passed on ${esc(bv)}, fail on ${esc(cv)}</h3>
+      <table><thead><tr><th>Case</th><th>Question</th><th>Broke</th></tr></thead><tbody>${regs}</tbody></table></div>`;
+}
+
+// ---------- boot
+(async function () {
+  META = await api("/api/meta");
+  const opts = META.versions.map(v => `<option>${esc(v)}</option>`).join("");
+  ["#askVersion", "#evalVersion", "#baseVersion", "#candVersion"].forEach(s => $(s).innerHTML = opts);
+  if (META.versions.length > 1) $("#candVersion").value = META.versions[1];
+  $("#modePill").textContent = META.has_key ? "● LIVE: API key found" : "● REPLAY: no API key";
+  $("#modePill").style.cssText = META.has_key ? "background:var(--pass-soft);color:var(--pass)" : "background:var(--warn-soft);color:var(--warn)";
+  initVibe();
+  $("#evalVersion").onchange = () => loadResult($("#evalVersion").value);
+  $("#runBtn").onclick = runEval;
+  $("#cmpBtn").onclick = compare;
+  await loadResult($("#evalVersion").value);
+  // Deep links: #eval:AD-01 opens that row, #eval:AD-01:prompt also opens its judge prompt,
+  // #eval@v2:AD-01 picks the prompt version first.
+  const [tabPart, openId, extra] = location.hash.slice(1).split(":");
+  const [tab, ver] = tabPart.split("@");
+  if (ver && META.versions.includes(ver)) { $("#evalVersion").value = ver; await loadResult(ver); }
+  document.querySelector(`nav button[data-tab="${tab}"]`)?.click();
+  if (openId && CURRENT) { OPEN.add(openId); renderRows(CURRENT.cases, $("#evalVersion").value); }
+  if (openId && extra === "prompt") showJudgePrompt($("#evalVersion").value, openId);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+# Secrets — real keys live only in .env (see .env.example)
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Local-only demo state
+results/human_labels.json
+results/backup/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
