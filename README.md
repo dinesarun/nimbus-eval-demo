@@ -84,3 +84,7 @@ Then select **v2** (the saved run loads instantly, or click Run to do it live):
 - **Deep links for bookmarks:** `localhost:8000/#eval`, `#compare`, `#eval:AD-04` (opens that row), `#eval@v2:AD-01:prompt` (v2 run, opens AD-01 and its judge prompt).
 - **Reset human labels:** delete `results/human_labels.json`.
 - **Remove cases you added live:** edit `evals/dataset.json`.
+
+## License
+
+[MIT](LICENSE). Fork it, adapt the dataset to your own product and use it in your own talks.
